@@ -1,34 +1,15 @@
 #include <iostream>
+#include <iomanip>
 #include <string>
-#include <format>
 #include <cuda_runtime.h>
 #include "siphash.h"
 #include "params.h"
-
-#define GROUP_SIZE 256
-
-struct WorkSize {
-    long long group;
-    long long global;
-    WorkSize(long long group_size, long long n) : group(group_size), global(n) {}
-    long long gridSize() const { return (global + group - 1) / group; }
-    long long blockSize() const { return group; }
-};
-
-#define CUDA_CHECK_KERNEL()                                                   \
-    do {                                                                      \
-        cudaError_t err = cudaDeviceSynchronize();                            \
-        if (err != cudaSuccess) {                                             \
-            std::cerr << "cuda error: " << cudaGetErrorString(err) << "\n";   \
-            std::exit(1);                                                     \
-        }                                                                     \
-    } while (0)
 
 __constant__ uint64_t d_target;
 __device__ long long d_found;
 
 __global__ void crack(long long n) {
-    const long long index = blockIdx.x * (long long)blockDim.x + threadIdx.x;
+    long long index = blockIdx.x * (long long)blockDim.x + threadIdx.x;
     if (index >= n)
         return;
 
@@ -42,28 +23,24 @@ __global__ void crack(long long n) {
         d_found = index;
 }
 
-namespace cuda {
-long long crack(const WorkSize &ws, uint64_t target, long long n) {
-    long long init = -1;
-    cudaMemcpyToSymbol(d_target, &target, sizeof(uint64_t));
-    cudaMemcpyToSymbol(d_found, &init, sizeof(long long));
-    ::crack<<<ws.gridSize(), ws.blockSize()>>>(n);
-    CUDA_CHECK_KERNEL();
-    long long found;
-    cudaMemcpyFromSymbol(&found, d_found, sizeof(long long));
-    return found;
-}
-}
-
 int main() {
     std::string pass;
     std::cout << "password: ";
     std::cin >> pass;
     uint64_t target = siphash24(pass);
-    std::cout << "hash: " << std::format("{:016x}", target) << "\n";
+    std::cout << "hash: " << std::hex << std::setw(16) << std::setfill('0') << target << std::dec << "\n";
 
-    WorkSize ws(GROUP_SIZE, TOTAL);
-    long long found = cuda::crack(ws, target, TOTAL);
+    long long init = -1;
+    cudaMemcpyToSymbol(d_target, &target, sizeof(uint64_t));
+    cudaMemcpyToSymbol(d_found, &init, sizeof(long long));
+
+    int group = 256;
+    long long grid = (TOTAL + group - 1) / group;
+    crack<<<grid, group>>>(TOTAL);
+    cudaDeviceSynchronize();
+
+    long long found;
+    cudaMemcpyFromSymbol(&found, d_found, sizeof(long long));
 
     if (found < 0) {
         std::cout << "not found\n";

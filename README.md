@@ -16,8 +16,8 @@
 ## Локально (с nvcc)
 
 ```bash
-nvcc -O3 -std=c++20 9_cuda.cu  -o 9_cuda
-nvcc -O3 -std=c++20 9a_cuda.cu -o 9a_cuda
+nvcc -O3 -std=c++17 9_cuda.cu  -o 9_cuda
+nvcc -O3 -std=c++17 9a_cuda.cu -o 9a_cuda
 echo 123456789 | ./9_cuda
 echo 123456789 | ./9a_cuda
 ```
