@@ -27,6 +27,7 @@ int main() {
     std::string pass;
     std::cout << "password: ";
     std::cin >> pass;
+    std::cout << pass << "\n";
     uint64_t target = siphash24(pass);
     std::cout << "hash: " << std::hex << std::setw(16) << std::setfill('0') << target << std::dec << "\n";
 
